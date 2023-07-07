@@ -1,5 +1,8 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, flash
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+import os
+from flask_mail import Mail, Message
 import pymysql
 
 app = Flask(__name__)
@@ -7,11 +10,15 @@ app = Flask(__name__)
 
 app.config["SECRET_KEY"] = "myapplication123"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///data.db"
+app.config["MAIL_SERVER"] = "smtp.gmail.com"
+app.config["MAIL_PORT"] = 465
+app.config["MAIL_USE_SSL"] = True
+app.config["MAIL_USERNAME"] = "sanjarbek.soatov1989@gmail.com"
+app.config["MAIL_PASSWORD"] = os.getenv("PASSWORD")
 
+db = SQLAlchemy(app=app)
 
-db = SQLAlchemy(app)
-
-
+mail = Mail(app)
 
 
 class Form(db.Model):
@@ -21,6 +28,7 @@ class Form(db.Model):
     last_name = db.Column(db.String(80))
     email = db.Column(db.String(80))
     date = db.Column(db.Date)
+
     occupation = db.Column(db.String(80))
 
 
@@ -29,9 +37,24 @@ def index():
     if request.method == "POST":
         first_name = request.form["first_name"]
         last_name = request.form["last_name"]
-        email_name = request.form["email"]
+        email = request.form["email"]
         date = request.form["date"]
+        date_obj = datetime.strptime(date, "%Y-%m-%d")
         occupation = request.form["occupation"]
+
+        form = Form(first_name=first_name, last_name=last_name, email=email, date=date_obj, occupation=occupation)
+        db.session.add(form)
+        db.session.commit()
+        message_body = f"Thank you for your submission, {first_name}"\
+                       f"Here are your data:{first_name}\n{last_name}\n{date}\n"\
+                       f"Thank you"
+        message = Message(subject="New form submission",
+                          sender=app.config["MAIL_USERNAME"],
+                          recipients=[email],
+                          body=message_body)
+        mail.send(message)
+
+        flash(f"{first_name.title()},Your form was submitted successfully!", "success")
     return render_template("index.html")
 
 
